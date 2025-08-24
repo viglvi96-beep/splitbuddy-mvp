@@ -2,10 +2,23 @@ from __future__ import annotations
 import os
 from decimal import Decimal, ROUND_HALF_UP
 from uuid import uuid4
-from datetime import datetime
+from datetime import datetime, timezone
 
 from flask import Flask, request, jsonify, redirect, make_response
 from flask_cors import CORS
+
+# --- формат без таймзони: 'YYYY-MM-DD HH:MM:SS'
+def iso_naive(dt: datetime) -> str:
+    """
+    Повертає рядок без таймзони. Якщо dt "aware" — конвертуємо в UTC і
+    прибираємо tzinfo; якщо "naive" — форматую як є.
+    """
+    try:
+        if dt.tzinfo is not None:
+            dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+        return dt.strftime("%Y-%m-%d %H:%M:%S")
+    except Exception:
+        return str(dt)
 
 # ---------- Flask ----------
 app = Flask(__name__, static_folder="static", static_url_path="/static")
@@ -102,7 +115,7 @@ def from_cents(cents: int) -> str:
     return f"{Decimal(cents) / Decimal(100):.2f}"
 
 def now_ts():
-    # використовуємо UTC
+    # naive UTC (без tzinfo)
     return datetime.utcnow()
 
 def event_exists(event_id: str) -> bool:
@@ -137,7 +150,7 @@ def create_event():
         "id": ev["id"],
         "name": ev["name"],
         "currency": ev["currency"],
-        "created_at": ev["created_at"].isoformat() + "Z",
+        "created_at": iso_naive(ev["created_at"]),
     })
 
 # ====== ГЛОБАЛЬНИЙ СПИСОК ПОДІЙ (для головної) ======
@@ -163,7 +176,7 @@ def list_events():
         rows = cur.fetchall()
 
     for r in rows:
-        r["created_at"] = r["created_at"].isoformat() + "Z"
+        r["created_at"] = iso_naive(r["created_at"])
     return jsonify(rows)
 
 # (опційно) Видалення події цілком
@@ -182,8 +195,10 @@ def get_event(event_id):
         ev = cur.fetchone()
         if not ev:
             return jsonify({"error": "Event not found"}), 404
+
         cur.execute("SELECT id, name FROM participants WHERE event_id=%s ORDER BY id", (event_id,))
         parts = cur.fetchall()
+
         cur.execute("SELECT * FROM expenses WHERE event_id=%s ORDER BY id", (event_id,))
         expenses = cur.fetchall()
         exp_list = []
@@ -196,13 +211,14 @@ def get_event(event_id):
                 "amount": from_cents(ex["amount_cents"]),
                 "paid_by": ex["paid_by"],
                 "participants": involved,
-                "created_at": ex["created_at"].isoformat() + "Z",
+                "created_at": iso_naive(ex["created_at"]),
             })
+
     return jsonify({
         "id": ev["id"],
         "name": ev["name"],
         "currency": ev["currency"],
-        "created_at": ev["created_at"].isoformat() + "Z",
+        "created_at": iso_naive(ev["created_at"]),
         "participants": parts,
         "expenses": exp_list
     })
