@@ -1,45 +1,42 @@
-<!doctype html>
-<meta charset="utf-8">
-<title>Доступ</title>
-<style>
-body{font-family:system-ui;padding:40px;background:#0b0d12;color:#e8eaed}
-input,button{padding:10px;border-radius:8px;border:1px solid #2a3a60;background:#0d1320;color:#e8eaed}
-button{margin-left:8px}
-</style>
-<h2>Введіть ваш ключ доступу</h2>
-<p>Цей сайт доступний лише для запрошених користувачів.</p>
-<input id="k" placeholder="Вставте ключ">
-<button onclick="go()">Увійти</button>
-<script>
-  function go(){
-    const v = document.getElementById('k').value.trim();
-    if(!v) return alert('Введіть ключ');
-    document.cookie = "access="+encodeURIComponent(v)+";path=/;SameSite=Lax";
-    location.href="/";
-  }
-</script>
-async function go(){
-    const v = document.getElementById('k').value.trim();
-    if(!v){ alert('Введіть ключ'); return; }
-    try{
-      const r = await fetch('/auth', {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({code: v})
-      });
-      if(r.ok){
-        // бекенд поставив кукі — просто на головну
-        location.href = '/';
-      }else{
-        document.getElementById('err')?.remove();
-        const p = document.createElement('p');
-        p.id = 'err';
-        p.style.color = '#ff6b6b';
-        p.textContent = 'Невірний ключ. Спробуйте ще раз або запитайте власника сайту.';
-        document.body.appendChild(p);
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8">
+  <title>Вхід за кодом</title>
+  <style>
+    body { font-family: sans-serif; background:#111; color:#eee; text-align:center; margin-top:100px; }
+    input { padding:8px; }
+    button { padding:8px 16px; margin-left:5px; }
+  </style>
+</head>
+<body>
+  <h2>Введіть ваш ключ доступу</h2>
+  <p>Цей сайт доступний лише для запрошених користувачів.</p>
+
+  <input id="k" placeholder="Вставте ключ">
+  <button onclick="go()">Увійти</button>
+  <p id="err" style="color:#ff6b6b;"></p>
+
+  <script>
+    async function go(){
+      const v = document.getElementById('k').value.trim();
+      if(!v){ alert('Введіть ключ'); return; }
+      try{
+        const r = await fetch('/auth', {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify({code: v})
+        });
+        if(r.ok){
+          location.href = '/'; // бекенд вже поставив cookie
+        }else{
+          document.getElementById('err').textContent =
+            'Невірний ключ. Спробуйте ще раз або запитайте власника сайту.';
+        }
+      }catch(e){
+        alert('Помилка мережі. Спробуйте ще раз.');
       }
-    }catch(e){
-      alert('Помилка мережі. Спробуйте ще раз.');
     }
-  }
-</script>
+  </script>
+</body>
+</html>
