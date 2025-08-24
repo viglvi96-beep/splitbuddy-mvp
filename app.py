@@ -11,7 +11,7 @@ from flask_cors import CORS
 app = Flask(__name__, static_folder="static", static_url_path="/static")
 CORS(app)
 
-# ---------- Access (4 токени) ----------
+# ---------- Access (токени) ----------
 ACCESS_TOKENS = [
     "you-123-Vitalii",
     "friend1-456",
@@ -21,9 +21,9 @@ ACCESS_TOKENS = [
 ENV_TOKENS = os.environ.get("ACCESS_TOKENS")
 if ENV_TOKENS:
     ACCESS_TOKENS = [t.strip() for t in ENV_TOKENS.split(",") if t.strip()]
+
 @app.before_request
 def simple_gate():
-    from flask import request
     # дозволяємо форму і сам /auth
     if request.path in ("/auth",) or request.path.startswith("/static/join.html"):
         return None
@@ -40,40 +40,26 @@ def simple_gate():
     if cookie_k and cookie_k in ACCESS_TOKENS:
         return None
 
-    # інакше просимо ввести код
+    # інакше просимо ввести код (захищаємо головну, сторінки подій і API)
     if request.path == "/" or request.path.startswith(("/e/", "/api/", "/static/index.html")):
         return redirect("/static/join.html")
+
 @app.post("/auth")
 def auth():
     data = request.get_json(force=True, silent=True) or {}
     code = (data.get("code") or "").strip()
     if code in ACCESS_TOKENS:
         resp = make_response(jsonify({"ok": True}))
-        # збережемо у cookie і впустимо надалі без повторного вводу
         resp.set_cookie("access", code, httponly=False, samesite="Lax")
         return resp
     return jsonify({"ok": False, "error": "invalid_code"}), 401
-def simple_gate():
-    from flask import request
-    if request.path.startswith("/static/join.html"):
-        return None
-    k = request.args.get("k")
-    if k:
-        resp = make_response(redirect(request.path or "/"))
-        resp.set_cookie("access", k, httponly=False, samesite="Lax")
-        return resp
-    cookie_k = request.cookies.get("access")
-    if cookie_k in ACCESS_TOKENS:
-        return None
-    if request.path == "/" or request.path.startswith(("/e/", "/api/", "/static/index.html")):
-        return redirect("/static/join.html")
-    return None
 
 # ---------- DB: Postgres (Neon) ----------
 import psycopg
 from psycopg.rows import dict_row
 
 DATABASE_URL = os.environ["DATABASE_URL"]  # мусить бути задана
+
 def get_db():
     # autocommit для простоти
     return psycopg.connect(DATABASE_URL, autocommit=True, row_factory=dict_row)
@@ -136,8 +122,25 @@ def event_page(event_id):
 # ---------- API ----------
 @app.route("/api/events", methods=["POST"])
 def create_event():
- # ====== ГЛОБАЛЬНИЙ СПИСОК ПОДІЙ (для головної) ======
+    data = request.get_json(force=True, silent=True) or {}
+    name = (data.get("name") or "").strip() or "Нова подія"
+    currency = (data.get("currency") or "UAH").strip().upper() or "UAH"
+    event_id = uuid4().hex[:8]
+    with get_db() as conn, conn.cursor() as cur:
+        cur.execute(
+            "INSERT INTO events (id, name, currency, created_at) VALUES (%s, %s, %s, %s)",
+            (event_id, name, currency, now_ts())
+        )
+        cur.execute("SELECT * FROM events WHERE id=%s", (event_id,))
+        ev = cur.fetchone()
+    return jsonify({
+        "id": ev["id"],
+        "name": ev["name"],
+        "currency": ev["currency"],
+        "created_at": ev["created_at"].isoformat() + "Z",
+    })
 
+# ====== ГЛОБАЛЬНИЙ СПИСОК ПОДІЙ (для головної) ======
 @app.get("/api/events")
 def list_events():
     """
@@ -163,7 +166,6 @@ def list_events():
         r["created_at"] = r["created_at"].isoformat() + "Z"
     return jsonify(rows)
 
-
 # (опційно) Видалення події цілком
 @app.delete("/api/events/<event_id>")
 def delete_event(event_id):
@@ -172,6 +174,7 @@ def delete_event(event_id):
         if cur.rowcount == 0:
             return jsonify({"error": "Event not found"}), 404
     return jsonify({"ok": True})
+
 @app.route("/api/events/<event_id>", methods=["GET"])
 def get_event(event_id):
     with get_db() as conn, conn.cursor() as cur:
