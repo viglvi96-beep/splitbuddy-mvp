@@ -32,41 +32,33 @@ const api = {
 
 // ===== посилання на DOM =====
 const els = {
-  // головні екрани
   newEvent: document.getElementById('new-event'),
   event: document.getElementById('event'),
 
-  // заголовок та шарінг
   eventTitle: document.getElementById('event-title'),
   shareLink: document.getElementById('share-link'),
   copyLink: document.getElementById('copy-link'),
 
-  // створення події (форма на головній)
   createEvent: document.getElementById('create-event'),
   eventName: document.getElementById('event-name'),
   eventCurrency: document.getElementById('event-currency'),
 
-  // учасники
   participantName: document.getElementById('participant-name'),
   addParticipant: document.getElementById('add-participant'),
   participantsList: document.getElementById('participants'),
 
-  // витрати
   expenseTitle: document.getElementById('expense-title'),
   expenseAmount: document.getElementById('expense-amount'),
   expensePaidBy: document.getElementById('expense-paid-by'),
   expenseParticipants: document.getElementById('expense-participants'),
   addExpense: document.getElementById('add-expense'),
 
-  // списки
   expensesList: document.getElementById('expenses'),
   balances: document.getElementById('balances'),
   transfers: document.getElementById('transfers'),
 
-  // секція "Мої події" (може бути відсутня на сторінці)
+  // списки подій
   myEventsTbody: document.querySelector('#my-events tbody'),
-
-  // секція "Останні події" (може бути відсутня)
   teamEventsTbody: document.querySelector('#team-events tbody'),
   searchEvents: document.getElementById('search-events'),
   refreshEvents: document.getElementById('refresh-events'),
@@ -99,7 +91,7 @@ els.copyLink?.addEventListener('click', () => {
   setTimeout(() => els.copyLink.textContent = 'Копіювати посилання', 1200);
 });
 
-// ===== утиліти для «списку моїх подій» =====
+// ===== утиліти для «моїх подій» =====
 const LS_KEY = 'my_events_v1';
 const escapeHtml = (s='') => String(s)
   .replaceAll('&','&amp;').replaceAll('<','&lt;')
@@ -158,7 +150,7 @@ function renderMyEvents() {
   attachCopyButtons('#my-events');
 }
 
-// ===== «Останні події в команді» (бекенд /api/events) =====
+// ===== «Останні події в команді» =====
 async function loadTeamEvents(q='') {
   const url = q ? `/api/events?q=${encodeURIComponent(q)}` : '/api/events';
   const res = await fetch(url);
@@ -204,7 +196,6 @@ function renderParticipants(){
     els.participantsList.appendChild(li);
   });
 
-  // select "paid by"
   if (els.expensePaidBy) {
     els.expensePaidBy.innerHTML = '';
     state.participants.forEach(p => {
@@ -215,7 +206,6 @@ function renderParticipants(){
     });
   }
 
-  // chips для "involved"
   if (els.expenseParticipants) {
     els.expenseParticipants.innerHTML = '';
     state.participants.forEach(p => {
@@ -278,8 +268,6 @@ async function loadEvent(){
   renderExpenses();
   await renderSettlements();
   setShareLink(currentEventId);
-
-  // ✅ запам'ятати у «Мої події», щоб показати на головній наступного разу
   rememberEvent({
     id: currentEventId,
     name: state.name,
@@ -295,7 +283,6 @@ els.createEvent?.addEventListener('click', async () => {
   const data = await api.post('/api/events', { name, currency });
   currentEventId = data.id;
 
-  // ✅ зберегти в «Мої події» одразу після створення
   rememberEvent({
     id: data.id, name: data.name, currency: data.currency, created_at: data.created_at
   });
@@ -331,7 +318,7 @@ els.addExpense?.addEventListener('click', async () => {
 
 // ===== boot =====
 async function boot(){
-  // якщо на сторінці є секції списків — ініціалізуємо їх
+  // списки на головній
   renderMyEvents();
   if (els.refreshEvents) {
     els.refreshEvents.addEventListener('click', () => {
@@ -349,43 +336,6 @@ async function boot(){
   if (els.teamEventsTbody) {
     renderTeamEvents();
   }
-# ====== ГЛОБАЛЬНИЙ СПИСОК ПОДІЙ (для головної) ======
-
-@app.get("/api/events")
-def list_events():
-    """
-    GET /api/events?limit=20&q=карпати
-    Повертає останні події, відсортовані за created_at (видно всім, у кого є доступ).
-    """
-    limit = min(int(request.args.get("limit", 20)), 100)
-    q = (request.args.get("q") or "").strip()
-
-    sql = "SELECT id, name, currency, created_at FROM events"
-    params = []
-    if q:
-        sql += " WHERE name ILIKE %s"
-        params.append(f"%{q}%")
-    sql += " ORDER BY created_at DESC LIMIT %s"
-    params.append(limit)
-
-    with get_db() as conn, conn.cursor() as cur:
-        cur.execute(sql, tuple(params))
-        rows = cur.fetchall()
-
-    # конвертуємо дату у ISO-рядок для фронта
-    for r in rows:
-        r["created_at"] = r["created_at"].isoformat() + "Z"
-    return jsonify(rows)
-
-
-# (опційно) Видалення події цілком
-@app.delete("/api/events/<event_id>")
-def delete_event(event_id):
-    with get_db() as conn, conn.cursor() as cur:
-        cur.execute("DELETE FROM events WHERE id=%s", (event_id,))
-        if cur.rowcount == 0:
-            return jsonify({"error": "Event not found"}), 404
-    return jsonify({"ok": True})
 
   // відкриття /e/<id> або показ форми створення
   const m = location.pathname.match(/^\/e\/([a-z0-9]{8})$/i);
