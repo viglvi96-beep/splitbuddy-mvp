@@ -1,0 +1,20 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Доступ</title>
+<style>
+body{font-family:system-ui;padding:40px;background:#0b0d12;color:#e8eaed}
+input,button{padding:10px;border-radius:8px;border:1px solid #2a3a60;background:#0d1320;color:#e8eaed}
+button{margin-left:8px}
+</style>
+<h2>Введіть ваш ключ доступу</h2>
+<p>Цей сайт доступний лише для запрошених користувачів.</p>
+<input id="k" placeholder="Вставте ключ">
+<button onclick="go()">Увійти</button>
+<script>
+  function go(){
+    const v = document.getElementById('k').value.trim();
+    if(!v) return alert('Введіть ключ');
+    document.cookie = "access="+encodeURIComponent(v)+";path=/;SameSite=Lax";
+    location.href="/";
+  }
+</script>

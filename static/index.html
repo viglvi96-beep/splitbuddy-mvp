@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SplitBuddy — облік спільних витрат</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>SplitBuddy</h1>
+      <p class="tagline">Простий інструмент для обліку витрат у поїздках, побуті та на івентах — без реєстрації.</p>
+    </header>
+
+    <section id="new-event" class="card hidden">
+      <h2>Створити подію</h2>
+      <div class="row">
+        <label>Назва події</label>
+        <input id="event-name" placeholder="Наприклад, Поїздка до Львова" />
+      </div>
+      <div class="row">
+        <label>Валюта</label>
+        <select id="event-currency">
+          <option value="UAH">UAH ₴</option>
+          <option value="USD">USD $</option>
+          <option value="EUR">EUR €</option>
+          <option value="PLN">PLN zł</option>
+        </select>
+      </div>
+      <button id="create-event">Створити</button>
+    </section>
+
+    <section id="event" class="hidden">
+      <div class="share card">
+        <strong id="event-title"></strong>
+        <div class="share-row">
+          <input id="share-link" readonly />
+          <button id="copy-link">Копіювати посилання</button>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="card">
+          <h3>Учасники</h3>
+          <div class="row">
+            <input id="participant-name" placeholder="Імʼя учасника" />
+            <button id="add-participant">Додати</button>
+          </div>
+          <ul id="participants"></ul>
+        </div>
+
+        <div class="card">
+          <h3>Додати витрату</h3>
+          <div class="row">
+            <input id="expense-title" placeholder="Назва витрати (готель, таксі...)" />
+          </div>
+          <div class="row">
+            <input id="expense-amount" type="number" min="0" step="0.01" placeholder="Сума" />
+            <select id="expense-paid-by"></select>
+          </div>
+          <div class="row">
+            <div id="expense-participants" class="chips"></div>
+          </div>
+          <button id="add-expense">Додати витрату</button>
+          <p class="hint">Якщо нікого не обрано — сума ділиться порівну між усіма учасниками.</p>
+        </div>
+
+        <div class="card">
+          <h3>Витрати</h3>
+          <ul id="expenses"></ul>
+        </div>
+
+        <div class="card">
+          <h3>Підсумок</h3>
+          <div id="balances"></div>
+          <h4>Кому і скільки переказати</h4>
+          <ul id="transfers"></ul>
+        </div>
+      </div>
+    </section>
+
+    <footer>
+      <p>Зроблено з ❤ як відкритий MVP. Дані зберігаються локально в SQLite на сервері. Посилання дає доступ до події.</p>
+    </footer>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
