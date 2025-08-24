@@ -1,21 +1,51 @@
 <!DOCTYPE html>
 <html lang="uk">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Вхід за кодом</title>
   <style>
-    body { font-family: sans-serif; background:#111; color:#eee; text-align:center; margin-top:100px; }
-    input { padding:8px; }
-    button { padding:8px 16px; margin-left:5px; }
+    :root { color-scheme: dark; }
+    body {
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      background:#0b0d12; color:#e8eaed;
+      margin:0; padding:40px 20px;
+      display:flex; flex-direction:column; align-items:center;
+    }
+    h2 { margin:0 0 12px; font-size:1.6rem; text-align:center; }
+    p { opacity:.9; margin:0 0 20px; text-align:center; font-size:1rem; }
+
+    .row { display:flex; flex-wrap:wrap; gap:10px; justify-content:center; width:100%; max-width:400px; }
+    input,button {
+      flex:1;
+      padding:12px 14px;
+      border-radius:10px;
+      border:1px solid #2a3a60;
+      background:#0d1320; color:#e8eaed;
+      font-size:1rem;
+    }
+    input { min-width: 200px; }
+    button { cursor:pointer; flex:0 0 auto; }
+    #err { color:#ff6b6b; margin-top:14px; font-size:0.95rem; }
+
+    /* 📱 мобільна адаптація */
+    @media (max-width:480px){
+      body { padding:20px 10px; }
+      h2 { font-size:1.4rem; }
+      input,button { font-size:1rem; width:100%; }
+      .row { flex-direction:column; align-items:stretch; }
+    }
   </style>
 </head>
 <body>
   <h2>Введіть ваш ключ доступу</h2>
   <p>Цей сайт доступний лише для запрошених користувачів.</p>
 
-  <input id="k" placeholder="Вставте ключ">
-  <button onclick="go()">Увійти</button>
-  <p id="err" style="color:#ff6b6b;"></p>
+  <div class="row">
+    <input id="k" placeholder="Вставте ключ" />
+    <button onclick="go()">Увійти</button>
+  </div>
+  <p id="err"></p>
 
   <script>
     async function go(){
@@ -28,7 +58,7 @@
           body: JSON.stringify({code: v})
         });
         if(r.ok){
-          location.href = '/'; // бекенд вже поставив cookie
+          location.href = '/';
         }else{
           document.getElementById('err').textContent =
             'Невірний ключ. Спробуйте ще раз або запитайте власника сайту.';
