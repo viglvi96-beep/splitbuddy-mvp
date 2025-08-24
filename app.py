@@ -1,26 +1,17 @@
 from __future__ import annotations
 import os
-import json
-import sqlite3
-from dataclasses import dataclass
 from decimal import Decimal, ROUND_HALF_UP
 from uuid import uuid4
-from flask import Flask, request, jsonify, redirect, make_response
-from flask_cors import CORS
 from datetime import datetime
 
-# =========================
-#  Flask app + CORS
-# =========================
-DB_PATH = os.environ.get("DB_PATH", "db.sqlite3")
+from flask import Flask, request, jsonify, redirect, make_response
+from flask_cors import CORS
 
+# ---------- Flask ----------
 app = Flask(__name__, static_folder="static", static_url_path="/static")
 CORS(app)
 
-# =========================
-#  ДОСТУП ЛИШЕ ДЛЯ 4 ЛЮДЕЙ
-# =========================
-# Варіант 1: задай токени прямо тут (заміни на свої значення)
+# ---------- Access (4 токени) ----------
 ACCESS_TOKENS = [
     "you-123-Vitalii",
     "friend1-456",
@@ -28,166 +19,130 @@ ACCESS_TOKENS = [
     "friend3-abc",
 ]
 
-# Варіант 2 (рекомендовано на проді): через ENV:
-# ACCESS_TOKENS = [t.strip() for t in os.environ.get("ACCESS_TOKENS","").split(",") if t.strip()] or ACCESS_TOKENS
-
 @app.before_request
 def simple_gate():
-    """
-    Проста "брама":
-    - впускає лише якщо у cookie 'access' є один із дозволених токенів
-      або якщо перейшли з ?k=<token> (тоді ставимо cookie)
-    - якщо доступу немає — редіректимо на /static/join.html
-    """
-    # дозволяємо саму сторінку введення ключа й статичні ресурси до неї
+    from flask import request
     if request.path.startswith("/static/join.html"):
         return None
-
-    # Разовий вхід через параметр ?k=
     k = request.args.get("k")
     if k:
         resp = make_response(redirect(request.path or "/"))
         resp.set_cookie("access", k, httponly=False, samesite="Lax")
         return resp
-
-    # Перевіряємо cookie
     cookie_k = request.cookies.get("access")
     if cookie_k in ACCESS_TOKENS:
         return None
-
-    # Якщо токену немає — просимо ввести ключ
-    # (захищаємо головну, SPA-роути та API)
-    protected_prefixes = ("/", "/e/", "/api/", "/static/index.html")
-    if request.path == "/" or request.path.startswith(protected_prefixes):
+    if request.path == "/" or request.path.startswith(("/e/", "/api/", "/static/index.html")):
         return redirect("/static/join.html")
-
     return None
 
-# =========================
-#  DB helpers
-# =========================
+# ---------- DB: Postgres (Neon) ----------
+import psycopg
+from psycopg.rows import dict_row
+
+DATABASE_URL = os.environ["DATABASE_URL"]  # мусить бути задана
 def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
+    # autocommit для простоти
+    return psycopg.connect(DATABASE_URL, autocommit=True, row_factory=dict_row)
 
 def init_db():
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("""
+    sql = """
     CREATE TABLE IF NOT EXISTS events (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
         currency TEXT NOT NULL DEFAULT 'UAH',
-        created_at TEXT NOT NULL
-    )
-    """)
-    cur.execute("""
+        created_at TIMESTAMPTZ NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS participants (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        event_id TEXT NOT NULL,
-        name TEXT NOT NULL,
-        FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
-    )
-    """)
-    cur.execute("""
+        id SERIAL PRIMARY KEY,
+        event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+        name TEXT NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS expenses (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        event_id TEXT NOT NULL,
+        id SERIAL PRIMARY KEY,
+        event_id TEXT NOT NULL REFERENCES events(id) ON DELETE CASCADE,
         title TEXT NOT NULL,
         amount_cents INTEGER NOT NULL,
-        paid_by INTEGER NOT NULL, -- participant id
-        created_at TEXT NOT NULL,
-        FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE,
-        FOREIGN KEY (paid_by) REFERENCES participants(id) ON DELETE CASCADE
-    )
-    """)
-    cur.execute("""
+        paid_by INTEGER NOT NULL REFERENCES participants(id) ON DELETE CASCADE,
+        created_at TIMESTAMPTZ NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS expense_participants (
-        expense_id INTEGER NOT NULL,
-        participant_id INTEGER NOT NULL,
-        PRIMARY KEY (expense_id, participant_id),
-        FOREIGN KEY (expense_id) REFERENCES expenses(id) ON DELETE CASCADE,
-        FOREIGN KEY (participant_id) REFERENCES participants(id) ON DELETE CASCADE
-    )
-    """)
-    conn.commit()
-    conn.close()
+        expense_id INTEGER NOT NULL REFERENCES expenses(id) ON DELETE CASCADE,
+        participant_id INTEGER NOT NULL REFERENCES participants(id) ON DELETE CASCADE,
+        PRIMARY KEY (expense_id, participant_id)
+    );
+    """
+    with get_db() as conn, conn.cursor() as cur:
+        cur.execute(sql)
 
-def to_cents(amount: str | float | int) -> int:
+def to_cents(amount) -> int:
     d = Decimal(str(amount)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
     return int(d * 100)
 
 def from_cents(cents: int) -> str:
     return f"{Decimal(cents) / Decimal(100):.2f}"
 
-def now_iso():
-    return datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+def now_ts():
+    # використовуємо UTC
+    return datetime.utcnow()
 
 def event_exists(event_id: str) -> bool:
-    conn = get_db()
-    row = conn.execute("SELECT id FROM events WHERE id = ?", (event_id,)).fetchone()
-    conn.close()
-    return row is not None
+    with get_db() as conn, conn.cursor() as cur:
+        cur.execute("SELECT 1 FROM events WHERE id=%s", (event_id,))
+        return cur.fetchone() is not None
 
-# =========================
-#  PAGES
-# =========================
+# ---------- Pages ----------
 @app.route("/")
 def index():
     return app.send_static_file("index.html")
 
 @app.route("/e/<event_id>")
 def event_page(event_id):
-    # SPA deep-link
     return app.send_static_file("index.html")
 
-# =========================
-#  API
-# =========================
+# ---------- API ----------
 @app.route("/api/events", methods=["POST"])
 def create_event():
     data = request.get_json(force=True, silent=True) or {}
     name = data.get("name") or "New Event"
     currency = data.get("currency") or "UAH"
     event_id = uuid4().hex[:8]
-    conn = get_db()
-    conn.execute(
-        "INSERT INTO events (id, name, currency, created_at) VALUES (?, ?, ?, ?)",
-        (event_id, name, currency, now_iso())
-    )
-    conn.commit()
-    conn.close()
+    with get_db() as conn, conn.cursor() as cur:
+        cur.execute(
+            "INSERT INTO events (id, name, currency, created_at) VALUES (%s, %s, %s, %s)",
+            (event_id, name, currency, now_ts())
+        )
     return jsonify({"id": event_id, "name": name, "currency": currency})
 
 @app.route("/api/events/<event_id>", methods=["GET"])
 def get_event(event_id):
-    conn = get_db()
-    ev = conn.execute("SELECT * FROM events WHERE id = ?", (event_id,)).fetchone()
-    if not ev:
-        conn.close()
-        return jsonify({"error": "Event not found"}), 404
-    parts = conn.execute("SELECT * FROM participants WHERE event_id = ? ORDER BY id", (event_id,)).fetchall()
-    expenses = conn.execute("SELECT * FROM expenses WHERE event_id = ? ORDER BY id", (event_id,)).fetchall()
-    exp_list = []
-    for ex in expenses:
-        rows = conn.execute("SELECT participant_id FROM expense_participants WHERE expense_id = ?", (ex["id"],)).fetchall()
-        exp_part_ids = [r["participant_id"] for r in rows]
-        exp_list.append({
-            "id": ex["id"],
-            "title": ex["title"],
-            "amount": from_cents(ex["amount_cents"]),
-            "paid_by": ex["paid_by"],
-            "participants": exp_part_ids,
-            "created_at": ex["created_at"],
-        })
-    conn.close()
+    with get_db() as conn, conn.cursor() as cur:
+        cur.execute("SELECT * FROM events WHERE id=%s", (event_id,))
+        ev = cur.fetchone()
+        if not ev:
+            return jsonify({"error": "Event not found"}), 404
+        cur.execute("SELECT id, name FROM participants WHERE event_id=%s ORDER BY id", (event_id,))
+        parts = cur.fetchall()
+        cur.execute("SELECT * FROM expenses WHERE event_id=%s ORDER BY id", (event_id,))
+        expenses = cur.fetchall()
+        exp_list = []
+        for ex in expenses:
+            cur.execute("SELECT participant_id FROM expense_participants WHERE expense_id=%s", (ex["id"],))
+            involved = [r["participant_id"] for r in cur.fetchall()]
+            exp_list.append({
+                "id": ex["id"],
+                "title": ex["title"],
+                "amount": from_cents(ex["amount_cents"]),
+                "paid_by": ex["paid_by"],
+                "participants": involved,
+                "created_at": ex["created_at"].isoformat() + "Z",
+            })
     return jsonify({
         "id": ev["id"],
         "name": ev["name"],
         "currency": ev["currency"],
-        "created_at": ev["created_at"],
-        "participants": [{"id": p["id"], "name": p["name"]} for p in parts],
+        "created_at": ev["created_at"].isoformat() + "Z",
+        "participants": parts,
         "expenses": exp_list
     })
 
@@ -199,28 +154,25 @@ def add_participant(event_id):
     name = (data.get("name") or "").strip()
     if not name:
         return jsonify({"error": "Name required"}), 400
-    conn = get_db()
-    cur = conn.execute("INSERT INTO participants (event_id, name) VALUES (?, ?)", (event_id, name))
-    pid = cur.lastrowid
-    conn.commit()
-    conn.close()
-    return jsonify({"id": pid, "name": name})
+    with get_db() as conn, conn.cursor() as cur:
+        cur.execute(
+            "INSERT INTO participants (event_id, name) VALUES (%s, %s) RETURNING id, name",
+            (event_id, name)
+        )
+        row = cur.fetchone()
+    return jsonify(row)
 
 @app.route("/api/events/<event_id>/participants/<int:pid>", methods=["DELETE"])
 def delete_participant(event_id, pid):
-    conn = get_db()
-    row = conn.execute("SELECT id FROM participants WHERE id=? AND event_id=?", (pid, event_id)).fetchone()
-    if not row:
-        conn.close()
-        return jsonify({"error": "Participant not found"}), 404
-    ex = conn.execute("SELECT id FROM expenses WHERE paid_by=?", (pid,)).fetchone()
-    if ex:
-        conn.close()
-        return jsonify({"error": "Cannot delete participant who paid an expense."}), 400
-    conn.execute("DELETE FROM expense_participants WHERE participant_id=?", (pid,))
-    conn.execute("DELETE FROM participants WHERE id=?", (pid,))
-    conn.commit()
-    conn.close()
+    with get_db() as conn, conn.cursor() as cur:
+        cur.execute("SELECT 1 FROM participants WHERE id=%s AND event_id=%s", (pid, event_id))
+        if not cur.fetchone():
+            return jsonify({"error": "Participant not found"}), 404
+        cur.execute("SELECT 1 FROM expenses WHERE paid_by=%s", (pid,))
+        if cur.fetchone():
+            return jsonify({"error": "Cannot delete participant who paid an expense."}), 400
+        cur.execute("DELETE FROM expense_participants WHERE participant_id=%s", (pid,))
+        cur.execute("DELETE FROM participants WHERE id=%s", (pid,))
     return jsonify({"ok": True})
 
 @app.route("/api/events/<event_id>/expenses", methods=["POST"])
@@ -239,115 +191,98 @@ def add_expense(event_id):
         return jsonify({"error": "Amount must be > 0"}), 400
     if not isinstance(paid_by, int):
         return jsonify({"error": "paid_by participant id required"}), 400
-    conn = get_db()
-    pb = conn.execute("SELECT id FROM participants WHERE id=? AND event_id=?", (paid_by, event_id)).fetchone()
-    if not pb:
-        conn.close()
-        return jsonify({"error": "paid_by participant not found in event"}), 400
-    if not participants:
-        rows = conn.execute("SELECT id FROM participants WHERE event_id=?", (event_id,)).fetchall()
-        participants = [r["id"] for r in rows]
-    q_marks = ",".join("?" for _ in participants)
-    rows = conn.execute(f"SELECT id FROM participants WHERE event_id=? AND id IN ({q_marks})",
-                        (event_id, *participants)).fetchall()
-    if len(rows) != len(participants):
-        conn.close()
-        return jsonify({"error": "One or more participants invalid for this event"}), 400
-    cur = conn.execute(
-        "INSERT INTO expenses (event_id, title, amount_cents, paid_by, created_at) VALUES (?, ?, ?, ?, ?)",
-        (event_id, title, amount_cents, paid_by, now_iso())
-    )
-    expense_id = cur.lastrowid
-    for pid in participants:
-        conn.execute(
-            "INSERT INTO expense_participants (expense_id, participant_id) VALUES (?, ?)",
-            (expense_id, pid)
+
+    with get_db() as conn, conn.cursor() as cur:
+        cur.execute("SELECT 1 FROM participants WHERE id=%s AND event_id=%s", (paid_by, event_id))
+        if not cur.fetchone():
+            return jsonify({"error": "paid_by participant not found in event"}), 400
+
+        if not participants:
+            cur.execute("SELECT id FROM participants WHERE event_id=%s", (event_id,))
+            participants = [r["id"] for r in cur.fetchall()]
+
+        # перевірка, що всі учасники з цієї події
+        cur.execute(
+            "SELECT COUNT(*) AS c FROM participants WHERE event_id=%s AND id = ANY(%s)",
+            (event_id, participants)
         )
-    conn.commit()
-    conn.close()
+        if cur.fetchone()["c"] != len(participants):
+            return jsonify({"error": "One or more participants invalid for this event"}), 400
+
+        cur.execute(
+            "INSERT INTO expenses (event_id, title, amount_cents, paid_by, created_at) "
+            "VALUES (%s, %s, %s, %s, %s) RETURNING id",
+            (event_id, title, amount_cents, paid_by, now_ts())
+        )
+        expense_id = cur.fetchone()["id"]
+        for pid in participants:
+            cur.execute(
+                "INSERT INTO expense_participants (expense_id, participant_id) VALUES (%s, %s)",
+                (expense_id, pid)
+            )
     return jsonify({"id": expense_id})
 
 @app.route("/api/events/<event_id>/expenses/<int:eid>", methods=["DELETE"])
 def delete_expense(event_id, eid):
-    conn = get_db()
-    row = conn.execute("SELECT id FROM expenses WHERE id=? AND event_id=?", (eid, event_id)).fetchone()
-    if not row:
-        conn.close()
-        return jsonify({"error": "Expense not found"}), 404
-    conn.execute("DELETE FROM expense_participants WHERE expense_id=?", (eid,))
-    conn.execute("DELETE FROM expenses WHERE id=?", (eid,))
-    conn.commit()
-    conn.close()
+    with get_db() as conn, conn.cursor() as cur:
+        cur.execute("SELECT 1 FROM expenses WHERE id=%s AND event_id=%s", (eid, event_id))
+        if not cur.fetchone():
+            return jsonify({"error": "Expense not found"}), 404
+        cur.execute("DELETE FROM expense_participants WHERE expense_id=%s", (eid,))
+        cur.execute("DELETE FROM expenses WHERE id=%s", (eid,))
     return jsonify({"ok": True})
 
 @app.route("/api/events/<event_id>/settlements", methods=["GET"])
 def settlements(event_id):
-    conn = get_db()
-    ev = conn.execute("SELECT * FROM events WHERE id=?", (event_id,)).fetchone()
-    if not ev:
-        conn.close()
-        return jsonify({"error": "Event not found"}), 404
-    parts = conn.execute("SELECT id, name FROM participants WHERE event_id=?", (event_id,)).fetchall()
-    part_map = {p["id"]: p["name"] for p in parts}
-    balances = {pid: 0 for pid in part_map.keys()}
-    expenses = conn.execute("SELECT * FROM expenses WHERE event_id=?", (event_id,)).fetchall()
-    for ex in expenses:
-        ex_id = ex["id"]
-        amount = ex["amount_cents"]
-        paid_by = ex["paid_by"]
-        rows = conn.execute("SELECT participant_id FROM expense_participants WHERE expense_id=?", (ex_id,)).fetchall()
-        involved = [r["participant_id"] for r in rows]
-        if not involved:
-            continue
-        share = amount // len(involved)
-        remainder = amount - share * len(involved)
-        for i, pid in enumerate(involved):
-            owed = share + (1 if i < remainder else 0)
-            balances[pid] -= owed
-        balances[paid_by] += amount
-    conn.close()
+    with get_db() as conn, conn.cursor() as cur:
+        cur.execute("SELECT currency FROM events WHERE id=%s", (event_id,))
+        ev = cur.fetchone()
+        if not ev:
+            return jsonify({"error": "Event not found"}), 404
 
-    debtors = [(pid, -amt) for pid, amt in balances.items() if amt < 0]
-    creditors = [(pid, amt) for pid, amt in balances.items() if amt > 0]
-    debtors.sort(key=lambda x: x[1])
-    creditors.sort(key=lambda x: x[1])
+        cur.execute("SELECT id, name FROM participants WHERE event_id=%s", (event_id,))
+        parts = cur.fetchall()
+        part_map = {p["id"]: p["name"] for p in parts}
+        balances = {pid: 0 for pid in part_map.keys()}
 
-    i, j = 0, 0
-    transfers = []
-    while i < len(debtors) and j < len(creditors):
-        d_pid, d_amt = debtors[i]
-        c_pid, c_amt = creditors[j]
-        pay = min(d_amt, c_amt)
-        if pay > 0:
-            transfers.append({
-                "from_id": d_pid,
-                "to_id": c_pid,
-                "amount": from_cents(pay)
-            })
-        d_amt -= pay
-        c_amt -= pay
-        if d_amt == 0:
-            i += 1
-        else:
-            debtors[i] = (d_pid, d_amt)
-        if c_amt == 0:
-            j += 1
-        else:
-            creditors[j] = (c_pid, c_amt)
+        cur.execute("SELECT id, amount_cents, paid_by FROM expenses WHERE event_id=%s", (event_id,))
+        expenses = cur.fetchall()
+        for ex in expenses:
+            cur.execute("SELECT participant_id FROM expense_participants WHERE expense_id=%s", (ex["id"],))
+            involved = [r["participant_id"] for r in cur.fetchall()]
+            if not involved:
+                continue
+            amount = ex["amount_cents"]
+            share = amount // len(involved)
+            remainder = amount - share * len(involved)
+            for i, pid in enumerate(involved):
+                owed = share + (1 if i < remainder else 0)
+                balances[pid] -= owed
+            balances[ex["paid_by"]] += amount
 
-    balance_view = [
-        {"participant_id": pid, "name": part_map[pid], "balance": from_cents(amt)}
-        for pid, amt in sorted(balances.items())
-    ]
-    transfer_view = [
-        {"from": part_map[t["from_id"]], "to": part_map[t["to_id"]], "amount": t["amount"]}
-        for t in transfers
-    ]
-    return jsonify({
-        "currency": ev["currency"],
-        "balances": balance_view,
-        "transfers": transfer_view
-    })
+        debtors = [(pid, -amt) for pid, amt in balances.items() if amt < 0]
+        creditors = [(pid, amt) for pid, amt in balances.items() if amt > 0]
+        debtors.sort(key=lambda x: x[1])
+        creditors.sort(key=lambda x: x[1])
+
+        i, j = 0, 0
+        transfers = []
+        while i < len(debtors) and j < len(creditors):
+            d_pid, d_amt = debtors[i]
+            c_pid, c_amt = creditors[j]
+            pay = min(d_amt, c_amt)
+            if pay > 0:
+                transfers.append({"from": part_map[d_pid], "to": part_map[c_pid], "amount": from_cents(pay)})
+            d_amt -= pay
+            c_amt -= pay
+            if d_amt == 0: i += 1
+            else: debtors[i] = (d_pid, d_amt)
+            if c_amt == 0: j += 1
+            else: creditors[j] = (c_pid, c_amt)
+
+    balance_view = [{"participant_id": pid, "name": part_map[pid], "balance": from_cents(amt)}
+                    for pid, amt in sorted(balances.items())]
+    return jsonify({"currency": ev["currency"], "balances": balance_view, "transfers": transfers})
 
 if __name__ == "__main__":
     init_db()
