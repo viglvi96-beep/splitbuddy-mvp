@@ -349,6 +349,43 @@ async function boot(){
   if (els.teamEventsTbody) {
     renderTeamEvents();
   }
+# ====== ГЛОБАЛЬНИЙ СПИСОК ПОДІЙ (для головної) ======
+
+@app.get("/api/events")
+def list_events():
+    """
+    GET /api/events?limit=20&q=карпати
+    Повертає останні події, відсортовані за created_at (видно всім, у кого є доступ).
+    """
+    limit = min(int(request.args.get("limit", 20)), 100)
+    q = (request.args.get("q") or "").strip()
+
+    sql = "SELECT id, name, currency, created_at FROM events"
+    params = []
+    if q:
+        sql += " WHERE name ILIKE %s"
+        params.append(f"%{q}%")
+    sql += " ORDER BY created_at DESC LIMIT %s"
+    params.append(limit)
+
+    with get_db() as conn, conn.cursor() as cur:
+        cur.execute(sql, tuple(params))
+        rows = cur.fetchall()
+
+    # конвертуємо дату у ISO-рядок для фронта
+    for r in rows:
+        r["created_at"] = r["created_at"].isoformat() + "Z"
+    return jsonify(rows)
+
+
+# (опційно) Видалення події цілком
+@app.delete("/api/events/<event_id>")
+def delete_event(event_id):
+    with get_db() as conn, conn.cursor() as cur:
+        cur.execute("DELETE FROM events WHERE id=%s", (event_id,))
+        if cur.rowcount == 0:
+            return jsonify({"error": "Event not found"}), 404
+    return jsonify({"ok": True})
 
   // відкриття /e/<id> або показ форми створення
   const m = location.pathname.match(/^\/e\/([a-z0-9]{8})$/i);
