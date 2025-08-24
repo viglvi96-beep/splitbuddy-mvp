@@ -136,7 +136,9 @@ def event_page(event_id):
 # ---------- API ----------
 @app.route("/api/events", methods=["POST"])
 def create_event():
-    @app.get("/api/events")
+ # ====== ГЛОБАЛЬНИЙ СПИСОК ПОДІЙ (для головної) ======
+
+@app.get("/api/events")
 def list_events():
     """
     GET /api/events?limit=20&q=карпати
@@ -161,7 +163,8 @@ def list_events():
         r["created_at"] = r["created_at"].isoformat() + "Z"
     return jsonify(rows)
 
-# (опційно)
+
+# (опційно) Видалення події цілком
 @app.delete("/api/events/<event_id>")
 def delete_event(event_id):
     with get_db() as conn, conn.cursor() as cur:
@@ -169,8 +172,6 @@ def delete_event(event_id):
         if cur.rowcount == 0:
             return jsonify({"error": "Event not found"}), 404
     return jsonify({"ok": True})
-
-
 @app.route("/api/events/<event_id>", methods=["GET"])
 def get_event(event_id):
     with get_db() as conn, conn.cursor() as cur:
