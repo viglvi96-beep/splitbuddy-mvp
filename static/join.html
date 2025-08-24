@@ -18,3 +18,28 @@ button{margin-left:8px}
     location.href="/";
   }
 </script>
+async function go(){
+    const v = document.getElementById('k').value.trim();
+    if(!v){ alert('Введіть ключ'); return; }
+    try{
+      const r = await fetch('/auth', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({code: v})
+      });
+      if(r.ok){
+        // бекенд поставив кукі — просто на головну
+        location.href = '/';
+      }else{
+        document.getElementById('err')?.remove();
+        const p = document.createElement('p');
+        p.id = 'err';
+        p.style.color = '#ff6b6b';
+        p.textContent = 'Невірний ключ. Спробуйте ще раз або запитайте власника сайту.';
+        document.body.appendChild(p);
+      }
+    }catch(e){
+      alert('Помилка мережі. Спробуйте ще раз.');
+    }
+  }
+</script>
