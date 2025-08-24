@@ -38,6 +38,7 @@ const els = {
   eventTitle: document.getElementById('event-title'),
   shareLink: document.getElementById('share-link'),
   copyLink: document.getElementById('copy-link'),
+  deleteEvent: document.getElementById('delete-event'),
 
   createEvent: document.getElementById('create-event'),
   eventName: document.getElementById('event-name'),
@@ -108,6 +109,13 @@ function rememberEvent(ev) {
       created_at: ev.created_at || new Date().toISOString()
     });
     localStorage.setItem(LS_KEY, JSON.stringify(filtered.slice(0, 50)));
+  } catch (_) {}
+}
+function forgetEvent(eventId) {
+  try {
+    const list = JSON.parse(localStorage.getItem(LS_KEY) || '[]');
+    const filtered = list.filter(x => x.id !== eventId);
+    localStorage.setItem(LS_KEY, JSON.stringify(filtered));
   } catch (_) {}
 }
 function loadMyEvents() {
@@ -314,6 +322,25 @@ els.addExpense?.addEventListener('click', async () => {
   if (els.expenseTitle) els.expenseTitle.value = '';
   if (els.expenseAmount) els.expenseAmount.value = '';
   await loadEvent();
+});
+
+// *** Видалення події ***
+els.deleteEvent?.addEventListener('click', async () => {
+  if (!currentEventId) return;
+  if (!confirm('Точно видалити цю подію? Це незворотно.')) return;
+
+  try {
+    await api.del(`/api/events/${currentEventId}`);
+    forgetEvent(currentEventId);
+    alert('Подію видалено');
+
+    history.replaceState({}, '', '/');
+    showNewEvent();
+    renderMyEvents();
+    if (els.teamEventsTbody) renderTeamEvents();
+  } catch (e) {
+    alert('Помилка при видаленні: ' + e.message);
+  }
 });
 
 // ===== boot =====
