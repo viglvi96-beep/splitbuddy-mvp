@@ -140,7 +140,7 @@ def create_event():
 def list_events():
     """
     GET /api/events?limit=20&q=карпати
-    Повертає останні події (глобально), відсортовані за created_at.
+    Повертає останні події, відсортовані за created_at.
     """
     limit = min(int(request.args.get("limit", 20)), 100)
     q = (request.args.get("q") or "").strip()
@@ -156,28 +156,20 @@ def list_events():
     with get_db() as conn, conn.cursor() as cur:
         cur.execute(sql, tuple(params))
         rows = cur.fetchall()
-    # ISO строки для фронта
+
     for r in rows:
         r["created_at"] = r["created_at"].isoformat() + "Z"
     return jsonify(rows)
-    @app.delete("/api/events/<event_id>")
+
+# (опційно)
+@app.delete("/api/events/<event_id>")
 def delete_event(event_id):
     with get_db() as conn, conn.cursor() as cur:
         cur.execute("DELETE FROM events WHERE id=%s", (event_id,))
-        # завдяки ON DELETE CASCADE зникнуть учасники/витрати
         if cur.rowcount == 0:
             return jsonify({"error": "Event not found"}), 404
     return jsonify({"ok": True})
-    data = request.get_json(force=True, silent=True) or {}
-    name = data.get("name") or "New Event"
-    currency = data.get("currency") or "UAH"
-    event_id = uuid4().hex[:8]
-    with get_db() as conn, conn.cursor() as cur:
-        cur.execute(
-            "INSERT INTO events (id, name, currency, created_at) VALUES (%s, %s, %s, %s)",
-            (event_id, name, currency, now_ts())
-        )
-    return jsonify({"id": event_id, "name": name, "currency": currency})
+
 
 @app.route("/api/events/<event_id>", methods=["GET"])
 def get_event(event_id):
