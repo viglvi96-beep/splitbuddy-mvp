@@ -159,4 +159,40 @@ button.btn, .btn {
     width: auto;                 /* нормальна ширина кнопок */
   }
 }
+/* Список учасників */
+#participants li {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  background: #1e1e2f; /* або твій фон */
+  border-radius: 6px;
+  margin: 4px 0;
+}
+
+/* Ім’я учасника */
+#participants li div {
+  flex: 1;
+  font-size: 15px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Кнопка ✕ */
+#participants li button {
+  background: transparent;
+  border: none;
+  color: #f66;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 4px 8px;
+  margin-left: 8px;
+  border-radius: 4px;
+}
+
+#participants li button:hover {
+  background: rgba(255, 100, 100, 0.1);
+}
 
