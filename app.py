@@ -18,8 +18,41 @@ ACCESS_TOKENS = [
     "friend2-789",
     "friend3-abc",
 ]
-
+ENV_TOKENS = os.environ.get("ACCESS_TOKENS")
+if ENV_TOKENS:
+    ACCESS_TOKENS = [t.strip() for t in ENV_TOKENS.split(",") if t.strip()]
 @app.before_request
+def simple_gate():
+    from flask import request
+    # дозволяємо форму і сам /auth
+    if request.path in ("/auth",) or request.path.startswith("/static/join.html"):
+        return None
+
+    # варіант входу через ?k=код (зручно давати посиланням)
+    k = request.args.get("k")
+    if k:
+        resp = make_response(redirect(request.path or "/"))
+        resp.set_cookie("access", k, httponly=False, samesite="Lax")
+        return resp
+
+    # cookie вже стоїть і валідна?
+    cookie_k = request.cookies.get("access")
+    if cookie_k and cookie_k in ACCESS_TOKENS:
+        return None
+
+    # інакше просимо ввести код
+    if request.path == "/" or request.path.startswith(("/e/", "/api/", "/static/index.html")):
+        return redirect("/static/join.html")
+@app.post("/auth")
+def auth():
+    data = request.get_json(force=True, silent=True) or {}
+    code = (data.get("code") or "").strip()
+    if code in ACCESS_TOKENS:
+        resp = make_response(jsonify({"ok": True}))
+        # збережемо у cookie і впустимо надалі без повторного вводу
+        resp.set_cookie("access", code, httponly=False, samesite="Lax")
+        return resp
+    return jsonify({"ok": False, "error": "invalid_code"}), 401
 def simple_gate():
     from flask import request
     if request.path.startswith("/static/join.html"):
