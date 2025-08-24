@@ -159,40 +159,58 @@ button.btn, .btn {
     width: auto;                 /* нормальна ширина кнопок */
   }
 }
-/* Список учасників */
+/* Список учасників — рядок: ім'я ліворуч, маленька кнопка праворуч */
 #participants li {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding: 6px 10px;
-  background: #1e1e2f; /* або твій фон */
-  border-radius: 6px;
-  margin: 4px 0;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #1e1f2b;            /* підлаштуй під свою тему */
+  border-radius: 10px;
+  margin: 6px 0;
 }
 
-/* Ім’я учасника */
-#participants li div {
+/* Ім'я (щоб точно було видно і не «зникало») */
+#participants li .name {
   flex: 1;
-  font-size: 15px;
+  color: #e9ecf1;                 /* явний колір тексту */
+  font-size: 16px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* Кнопка ✕ */
-#participants li button {
+/* Кнопка видалення — компактна і не тягнеться на всю ширину */
+#participants li .del {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #ff6b6b;
+  color: #ff6b6b;
   background: transparent;
-  border: none;
-  color: #f66;
-  font-size: 16px;
-  line-height: 1;
+  border-radius: 999px;
+  padding: 0;
+  margin: 0;
   cursor: pointer;
-  padding: 4px 8px;
-  margin-left: 8px;
-  border-radius: 4px;
+  line-height: 1;
+  /* переб’ємо глобальні правила кнопок */
+  width: 28px !important;
 }
 
-#participants li button:hover {
-  background: rgba(255, 100, 100, 0.1);
+/* Ховер/актив для фідбеку */
+#participants li .del:hover {
+  background: rgba(255, 107, 107, 0.12);
+}
+#participants li .del:active {
+  transform: scale(.95);
+}
+
+/* На вузьких екранах трохи зменшимо шрифт імені */
+@media (max-width: 480px) {
+  #participants li .name { font-size: 15px; }
 }
 
