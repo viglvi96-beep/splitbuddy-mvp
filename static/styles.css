@@ -24,3 +24,12 @@ li:last-child{border-bottom:none}
 .hint{opacity:.7;font-size:12px}
 footer{opacity:.6;font-size:12px;margin-top:24px;text-align:center}
 .small{opacity:.85;font-size:12px}
+.logo-link {
+  color: inherit;       /* колір як у заголовка */
+  text-decoration: none;
+}
+
+.logo-link:hover {
+  text-decoration: underline; /* при наведенні можна робити підкреслення */
+}
+
