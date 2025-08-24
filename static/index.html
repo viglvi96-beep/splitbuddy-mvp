@@ -103,14 +103,44 @@
           <h4>Кому і скільки переказати</h4>
           <ul id="transfers"></ul>
         </div>
+
+        <!-- ⬇️ Новий статичний блок реквізитів -->
+        <div class="card">
+          <h3>Реквізити для переказу</h3>
+          <ul class="accounts">
+            <li>
+              Монобанк Віталій — 
+              <span class="acc-num">5375 4112 3456 7890</span>
+              <button class="btn secondary" onclick="copyText('5375411234567890', this)">Копіювати</button>
+            </li>
+            <li>
+              Приват Юля — 
+              <span class="acc-num">4149 1234 5678 9012</span>
+              <button class="btn secondary" onclick="copyText('4149123456789012', this)">Копіювати</button>
+            </li>
+            <!-- Можеш додати ще свої -->
+          </ul>
+          <p class="hint">Натисніть «Копіювати», щоб зберегти номер у буфері обміну.</p>
+        </div>
+        <!-- ⬆️ Кінець статичного блоку -->
       </div>
     </section>
 
     <footer>
-      <p>Зроблено з ❤ як відкритий MVP. Дані зберігаються локально в SQLite на сервері. Посилання дає доступ до події.</p>
+      <p>Зроблено з ❤ як відкритий MVP. Дані зберігаються в Postgres. Посилання дає доступ до події.</p>
     </footer>
   </div>
 
   <script src="/static/app.js"></script>
+  <script>
+    // глобальна функція копіювання (працює для статичного блоку вище)
+    function copyText(text, btn){
+      navigator.clipboard.writeText(text).then(()=>{
+        const old = btn.textContent;
+        btn.textContent = 'Скопійовано!';
+        setTimeout(()=> btn.textContent = old, 1200);
+      });
+    }
+  </script>
 </body>
 </html>
