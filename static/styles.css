@@ -32,4 +32,131 @@ footer{opacity:.6;font-size:12px;margin-top:24px;text-align:center}
 .logo-link:hover {
   text-decoration: underline; /* при наведенні можна робити підкреслення */
 }
+/* ===== mobile fixes ===== */
+:root {
+  --gap: 12px;
+}
+
+html, body {
+  -webkit-text-size-adjust: 100%;
+  overflow-x: hidden;
+}
+
+.container {
+  padding: 12px;
+  padding-bottom: calc(12px + env(safe-area-inset-bottom, 0));
+}
+
+h1 { font-size: 28px; line-height: 1.2; margin-bottom: 6px; }
+h2 { font-size: 22px; line-height: 1.25; }
+h3 { font-size: 18px; }
+
+.card { border-radius: 14px; padding: 14px; }
+
+input, select, button, textarea {
+  width: 100%;
+  font-size: 16px;             /* 16px щоб iOS не робив зум */
+  min-height: 42px;
+  line-height: 1.2;
+}
+
+button.btn, .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
+}
+
+/* Загальні ряди/групи полів */
+.row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* Сітки на сторінці події */
+.grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+
+/* Блок шарінгу лінку */
+.share-row {
+  display: flex;
+  gap: 10px;
+  flex-direction: column;       /* у стовпчик на мобілці */
+}
+.share-row input {
+  word-break: break-all;
+}
+
+/* Таблиці: стекаємо в картки на мобілці */
+.table-responsive { width: 100%; overflow-x: auto; }
+.table.stack-on-mobile thead { display: none; }
+.table.stack-on-mobile tr {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6px 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid rgba(255,255,255,.07);
+}
+.table.stack-on-mobile td {
+  display: contents;
+}
+.table.stack-on-mobile td[data-label]::before {
+  content: attr(data-label);
+  font-weight: 600;
+  opacity: .8;
+}
+.table.stack-on-mobile td:last-child {
+  grid-column: 1 / -1;
+  margin-top: 6px;
+}
+
+/* Чіпси (вибір учасників) */
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { padding: 6px 10px; border-radius: 999px; }
+
+/* Підписи/пояснення дрібні — але читабельні */
+.hint, .small { font-size: 13px; opacity: .85; }
+
+/* Лого-лінк не виглядає як звичайна ссилка */
+.logo-link { color: inherit; text-decoration: none; }
+.logo-link:hover { text-decoration: underline; }
+
+/* Дрібний тюнінг для дуже вузьких екранів */
+@media (max-width: 360px) {
+  h1 { font-size: 24px; }
+  .btn { padding: 9px 12px; }
+}
+/* ===== Share row layout (mobile tidy) ===== */
+.share-row {
+  display: grid;
+  grid-template-columns: 1fr;     /* мобілка: все в стовпчик */
+  gap: 10px;
+}
+
+.share-row input {
+  width: 100%;
+  overflow-wrap: anywhere;        /* довгі URL не вибивають верстку */
+}
+
+/* робимо кнопки повної ширини на мобілці */
+.share-row > button {
+  width: 100%;
+}
+
+/* ширші екрани — все в один ряд */
+@media (min-width: 480px) {
+  .share-row {
+    grid-template-columns: 1fr auto auto; /* інпут + 2 кнопки */
+    align-items: center;
+  }
+  .share-row > button {
+    width: auto;                 /* нормальна ширина кнопок */
+  }
+}
 
