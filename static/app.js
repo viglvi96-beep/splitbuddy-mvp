@@ -58,7 +58,6 @@ const els = {
   balances: document.getElementById('balances'),
   transfers: document.getElementById('transfers'),
 
-  // списки подій
   myEventsTbody: document.querySelector('#my-events tbody'),
   teamEventsTbody: document.querySelector('#team-events tbody'),
   searchEvents: document.getElementById('search-events'),
@@ -92,7 +91,7 @@ els.copyLink?.addEventListener('click', () => {
   setTimeout(() => els.copyLink.textContent = 'Копіювати посилання', 1200);
 });
 
-// ===== утиліти для «моїх подій» =====
+// ===== локальні події =====
 const LS_KEY = 'my_events_v1';
 const escapeHtml = (s='') => String(s)
   .replaceAll('&','&amp;').replaceAll('<','&lt;')
@@ -184,7 +183,6 @@ function renderParticipants(){
   els.participantsList.innerHTML = '';
   state.participants.forEach(p => {
     const li = document.createElement('li');
-
     const left = document.createElement('div');
     left.textContent = p.name;
     li.appendChild(left);
@@ -269,7 +267,7 @@ async function renderSettlements(){
   });
 }
 
-// ===== завантаження/збереження однієї події =====
+// ===== завантаження події =====
 async function loadEvent(){
   state = await api.get(`/api/events/${currentEventId}`);
   renderParticipants();
@@ -343,9 +341,22 @@ els.deleteEvent?.addEventListener('click', async () => {
   }
 });
 
+// ===== копіювання карток =====
+document.addEventListener('click', e => {
+  if (e.target.classList.contains('copy-card')) {
+    const row = e.target.closest('.card-row');
+    const input = row.querySelector('input');
+    if (input) {
+      input.select();
+      document.execCommand('copy');
+      e.target.textContent = 'Скопійовано!';
+      setTimeout(() => e.target.textContent = 'Скопіювати', 1200);
+    }
+  }
+});
+
 // ===== boot =====
 async function boot(){
-  // списки на головній
   renderMyEvents();
   if (els.refreshEvents) {
     els.refreshEvents.addEventListener('click', () => {
@@ -364,7 +375,6 @@ async function boot(){
     renderTeamEvents();
   }
 
-  // відкриття /e/<id> або показ форми створення
   const m = location.pathname.match(/^\/e\/([a-z0-9]{8})$/i);
   if (m) {
     currentEventId = m[1];
